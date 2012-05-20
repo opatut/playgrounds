@@ -68,46 +68,5 @@ void main() {
                 write("#");
             writeln();
         }
-
-        // normalize
-        // float max = 0;
-        // foreach(v; r) if(v[1] > max && max < float.max) max = v[1];
-        // if(max == 0 || max > float.max) continue;
-        // writeln("max ", max);
-
-        // float avg = 0;
-        // float x = 0.5;
-        // float next = 20;
-        // for(int i = 0; i < r.length; i++) {
-        //     if(r[i][0] > 400) break;
-
-        //     float v = r[i][1] / max;
-        //     avg += v;
-
-        //     if(r[i][0] > next) {
-        //         next += 20;
-        //         writef("  %08s | ", r[i][0]);
-        //         for(int j = 0; j < avg * 30.0 / x; ++j)
-        //             write("#");
-        //         writeln();
-
-        //         avg = 0;
-        //         x *= 2;
-        //     } 
-        // }
     }
-    
-    // auto r = fourier(input, bitrate);
-
-    // FIND THE MAXIMUM
-    // writefln(":: Searching for maximum values");
-    // float max_x = 0, max_y = 0;
-    // foreach(float[2] v; r) {
-    //     float x = v[0], y = v[1];
-    //     if(y > max_y) { 
-    //         max_x = x; max_y = y;
-    //     }
-    // }
-    // writefln("   Maximum at %s Hz (value: %s)", max_x, max_y);
-
 }
