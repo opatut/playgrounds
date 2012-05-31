@@ -78,8 +78,8 @@ void main() {
     // Graph
     graphNode.position = Vector3(100, 500, 0);
     int barCount = 24;
-    int barWidth = 15;
-    int barMargin = 5;
+    int barWidth = 12;
+    int barMargin = 8;
     int barHeight = 200;
     PolygonComponent[] bars = new PolygonComponent[barCount];
     for(int i = 0; i < barCount; ++i) {
@@ -128,10 +128,10 @@ void main() {
             auto bar = cast(PolygonComponent)graphNode.children[i].components[0];
             float V = values[i];
             float h = (- V) * barHeight;
-            h = -barHeight;
-            float w = barWidth * V;
+            h -= barWidth;
+            float w = barWidth;
             bar.points = rectangle(-w / 2, 0, w, h);
-            bar.color = Color(1, 1, 1, V);
+            bar.color = Color(1, 1, 1, V * 0.8 + 0.2);
         }
 
         window.update();
