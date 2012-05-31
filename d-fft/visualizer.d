@@ -32,6 +32,7 @@ float average(float[] input) {
 float rangeValue(Data d, float from, float to) {
     float[] vs;
     foreach(p; d) {
+        if(p.freq >= bufferSize) continue;
         if(p.freq >= from && p.freq <= to)
             vs ~= p.amp;
     }
@@ -39,7 +40,11 @@ float rangeValue(Data d, float from, float to) {
 }
 
 static const int bitrate = 192000;
-static const int bufferSize = 8192; // bitrate / 16 / 50; // 20 ms !??
+static const int bufferSize = 2 * 8192; // bitrate / 16 / 50; // 20 ms !??
+static const int barCount = 82;
+static const int barWidth = 6;
+static const int barMargin = 1;
+static const int barHeight = 200;
 
 void main() {
     // Create the window
@@ -74,18 +79,19 @@ void main() {
     cam.projectionMode = CameraComponent.ProjectionMode.Orthographic;
     cam.orthographicBounds = Rect(0, 0, 800, 600);
     rootNode.attachComponent(cam);
+    float m = 6;
+    PolygonComponent outer = new PolygonComponent("outerShape");
+    outer.color = Color(1, 1, 1, 0.1);
+    outer.setPoints(rectangle(-m, m, barCount * (barWidth + barMargin) + 2 * m, - barHeight - 2 * m));
+    graphNode.attachComponent(outer);
 
     // Graph
-    graphNode.position = Vector3(100, 500, 0);
-    int barCount = 24;
-    int barWidth = 12;
-    int barMargin = 8;
-    int barHeight = 200;
+    graphNode.position = Vector3(40, 500, 0);
     PolygonComponent[] bars = new PolygonComponent[barCount];
     for(int i = 0; i < barCount; ++i) {
         bars[i] = new PolygonComponent(format("bar-%s", i));
 
-        bars[i].points = rectangle(-barWidth / 2, 0, barWidth, -1.0 * i / barCount * barHeight);
+        bars[i].setPoints(rectangle(0, 0, barWidth, -1.0 * i / barCount * barHeight));
         bars[i].color = Color(1, 1, 1, sin(1.0 * i / barCount * PI) * 0.8 + .2);
 
         Node n = new Node(format("barNode-%s", i), graphNode);
@@ -111,26 +117,49 @@ void main() {
         }
 
         DataPoint[] r = fourier(fbuf, bitrate);
-        float fac = 1.0 / 1.5e+14 * 0.8;
+        float fac = 1.0 / 1.5e+14 * 2;
 
         // float min = 40;
         // float max = 22000;
 
+        float prev = 0;
+        float[] tmpValues = new float[barCount];
         for(int i = 0; i < barCount; ++i) {
-            float from = pow(2, i + 3);
-            float to = pow(2, i + 4);
+            float p = sqrt(1.15);
+            int I = 26 * 2 + 3;
+            float from = pow(p, i + I);
+            float to = pow(p, i + 1 + I);
 
             float v = rangeValue(r, from, to) * fac;
+            tmpValues[i] = v;
+        }
+        for(int i = 0; i < barCount; ++i) {
+            float v = tmpValues[i];
+            if(v == 0) {
+                float s = 0, e = 0;
+                int j = i, k = i;
+                while(s == 0 && j > 0) {
+                    s = tmpValues[j]; j--;
+                }
+                k = i;
+                while(e == 0 && k < barCount) {
+                    e = tmpValues[k]; k++;
+                }
+
+                v = (e - s) / (k * 1.0 / j) + s;
+            }
+
             //v = log10(v + 1);
             v = 1 - pow(E, -v);
-            values[i] = values[i] * 0.4 + 0.6 * v;
+            float x = 0.8;
+            values[i] = values[i] * x + (1-x) * v;
 
             auto bar = cast(PolygonComponent)graphNode.children[i].components[0];
             float V = values[i];
             float h = (- V) * barHeight;
             h -= barWidth;
             float w = barWidth;
-            bar.points = rectangle(-w / 2, 0, w, h);
+            bar.setPoints(rectangle(0, 0, w, h));
             bar.color = Color(1, 1, 1, V * 0.8 + 0.2);
         }
 
