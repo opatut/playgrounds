@@ -1,30 +1,107 @@
 import std.numeric;
 import std.math;
 import std.stdio;
+import std.string;
+import derp.all;
 
-T[2][] fourier(T)(T[] input, float bitrate) {
+struct DataPoint {
+    float freq, amp;
+    this(float f, float a) { freq = f; amp = a; }
+}
+
+alias DataPoint[] Data;
+
+DataPoint[] fourier(float[] input, float bitrate) {
     auto samples = input.length;
     auto f = fft(input);
-    T[2][] r = new T[2][f.length];
+    DataPoint[] r;
     for(int i = 0; i < samples; i++) {
-        T y = cast(T)(f[i].re * f[i].re + f[i].im * f[i].im);
-        T x = cast(T)(1.0 * i * bitrate / samples);
-
-        r[i] = [x, y];
+        float amp = cast(float)(f[i].re * f[i].re + f[i].im * f[i].im);
+        float freq = cast(float)(1.0 * i * bitrate / samples);
+        r ~= DataPoint(freq, amp);
     }
     return r;
 }
 
-static const int bitrate = 44100;
-static const int bufferSize = 4096; // bitrate / 16 / 50; // 20 ms !??
+float average(float[] input) {
+    float x = 0;
+    foreach(i; input) x += i;
+    return x;
+}
+
+float rangeValue(Data d, float from, float to) {
+    float[] vs;
+    foreach(p; d) {
+        if(p.freq >= from && p.freq <= to)
+            vs ~= p.amp;
+    }
+    return average(vs);
+}
+
+static const int bitrate = 192000;
+static const int bufferSize = 8192; // bitrate / 16 / 50; // 20 ms !??
 
 void main() {
+    // Create the window
+    Window window = new Window("Hello World", 1088, 612, Window.Mode.Windowed);
+    window.backgroundColor = Color.Black;
+
+    ResourceManager resourceManager = new ResourceManager();
+    Texture bg = resourceManager.loadT!Texture(new UrlString("data/bg.png"));
+    Font font = resourceManager.loadT!Font(new UrlString("data/DejaVuSans.ttf"));
+    font.pointSize = 20;
+
+    Node rootNode = new Node("rootNode");
+    Node spriteNode = new Node("spriteNode", rootNode);
+    Node graphNode = new Node("graphNode", rootNode);
+    Node fontNode = new Node("fontNode", rootNode);
+
+    // Create sprite
+    SpriteComponent sprite = new SpriteComponent("Sprite", bg);
+    sprite.size = Vector2(1088, 612);
+    sprite.smooth = true;
+    spriteNode.attachComponent(sprite);
+    spriteNode.position = Vector3(400, 300, 0);
+
+    // Headline
+    TextComponent text = new TextComponent("headline", "Music is awesome", font);
+    text.color = Color.White;
+    fontNode.attachComponent(text);
+    fontNode.position = Vector3(400, 50, 0);
+
+    // View
+    CameraComponent cam = window.viewports[0].currentCamera;
+    cam.projectionMode = CameraComponent.ProjectionMode.Orthographic;
+    cam.orthographicBounds = Rect(0, 0, 800, 600);
+    rootNode.attachComponent(cam);
+
+    // Graph
+    graphNode.position = Vector3(100, 500, 0);
+    int barCount = 24;
+    int barWidth = 15;
+    int barMargin = 5;
+    int barHeight = 200;
+    PolygonComponent[] bars = new PolygonComponent[barCount];
+    for(int i = 0; i < barCount; ++i) {
+        bars[i] = new PolygonComponent(format("bar-%s", i));
+
+        bars[i].points = rectangle(-barWidth / 2, 0, barWidth, -1.0 * i / barCount * barHeight);
+        bars[i].color = Color(1, 1, 1, sin(1.0 * i / barCount * PI) * 0.8 + .2);
+
+        Node n = new Node(format("barNode-%s", i), graphNode);
+        n.position = Vector3(i * (barWidth + barMargin), 0, 0);
+        n.attachComponent(bars[i]);
+    }
 
     auto f = File("/tmp/mpd.fifo", "r"); 
-
     short[bufferSize] buffer;
 
-    while(true) {
+    float[] values = new float[barCount];
+    for(int i = 0; i < barCount; ++i) {
+        values[i] = 1;
+    }
+
+    while(window.isOpen()) {
         auto b = f.rawRead(buffer);
         if(b.length < bufferSize) writeln("Buffer underflow");
 
@@ -33,40 +110,34 @@ void main() {
             fbuf[i] = buffer[i];
         }
 
-        auto r = fourier(fbuf, bitrate);
+        DataPoint[] r = fourier(fbuf, bitrate);
+        float fac = 1.0 / 1.5e+14 * 0.8;
 
-        // group
-        float[2][] groups;
-        int prev = 0, x = 0;
-        float max = 0;
-        for(int i = 1; i < r.length; i *= 2) {
-            float value = 0;
+        // float min = 40;
+        // float max = 22000;
 
-            for(int j = prev; j < i; ++j) {
-                value += r[j][1];
-            }
+        for(int i = 0; i < barCount; ++i) {
+            float from = pow(2, i + 3);
+            float to = pow(2, i + 4);
 
-            // value /= (i - prev);
-            prev = i;
+            float v = rangeValue(r, from, to) * fac;
+            //v = log10(v + 1);
+            v = 1 - pow(E, -v);
+            values[i] = values[i] * 0.4 + 0.6 * v;
 
-            if(value > max)
-                max = value;
-
-            groups ~= [r[i][0], value];
+            auto bar = cast(PolygonComponent)graphNode.children[i].components[0];
+            float V = values[i];
+            float h = (- V) * barHeight;
+            h = -barHeight;
+            float w = barWidth * V;
+            bar.points = rectangle(-w / 2, 0, w, h);
+            bar.color = Color(1, 1, 1, V);
         }
-        
-        writeln();
-        writeln();
-        max = 1.5e+14;
-        //max = 1.5e+12;
-        foreach(pair; groups) {
-            float k = pair[0], v = pair[1];
-            v /= max;
-            v = log10(v + 1); // I DON'T KNOW WHY THIS WORKS, but it seems good ;) 
-            writef(" % 8.0f | ", k);
-            for(int j = 0; j < v * 40.0; ++j)
-                write("#");
-            writeln();
-        }
+
+        window.update();
+        window.clear();
+        window.render();
+        window.display();
     }
+    window.close();
 }

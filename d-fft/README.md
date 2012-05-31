@@ -16,3 +16,5 @@ This is a useful test case. It reads data from a FIFO stream (/tmp/mpd.fifo) and
     }
 
 You can of course change the path or the name.
+
+For compilation, link the derp project dir as 'derp' in this folder, and make sure to compile derp with polygon support.
