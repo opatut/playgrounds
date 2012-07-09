@@ -1,0 +1,15 @@
+<server>
+    <application-settings location="*">
+        <web-sockets>true</web-sockets>
+        <debug>stack</debug>
+        <log-config>*</log-config>
+        <session-id-cookie>true</session-id-cookie>
+        <session-management>
+            <reload-is-new-session>false</reload-is-new-session>
+        </session-management>
+        <properties>
+          <property name="baseURL">http://192.168.0.110/</property>
+          <property name="resourcesURL">/resources/</property>
+        </properties>
+    </application-settings>
+</server>
